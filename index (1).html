@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Robot Rescue — Run, Learn, Survive</title>
+<style>
+:root{--bg:#0d1426;--panel:#141f39;--cyan:#39dceb;--yellow:#ffd44d;--red:#ff5d6e;--green:#60eb9c;--purple:#a685ff;--white:#f5f8ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#182747,#080c18 70%);color:var(--white);font-family:Arial,sans-serif;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:16px}
+.wrap{width:min(100%,1000px)}header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}h1{font-size:clamp(20px,4vw,30px);margin:0;color:var(--cyan);letter-spacing:1px}.hint{font-size:12px;color:#aebbd4}
+canvas{width:100%;height:auto;display:block;border:2px solid #33476e;border-radius:14px;background:#0d1426;box-shadow:0 15px 50px #0008;touch-action:manipulation}
+.controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}.controls button{background:#203052;color:white;border:1px solid #4d668f;border-radius:10px;padding:11px 17px;font-weight:bold;cursor:pointer}.controls button:active{background:#2d4c78}.note{text-align:center;color:#aebbd4;font-size:12px;margin:9px 0}
+</style>
+</head>
+<body><main class="wrap">
+<header><h1>🤖 AI ROBOT RESCUE</h1><div class="hint">RUN • LEARN • SURVIVE</div></header>
+<canvas id="game" width="1000" height="650" aria-label="AI Robot Rescue game"></canvas>
+<div class="controls">
+<button data-key="ArrowLeft">◀ LEFT</button><button data-key="ArrowRight">RIGHT ▶</button><button data-key="ArrowUp">⬆ JUMP</button><button data-key="ArrowDown">⬇ SLIDE</button><button id="start">START / RESTART</button>
+</div><p class="note">Keyboard: ← → move · ↑ or SPACE jump · ↓ slide · ENTER start/restart. On phones, use the buttons.</p>
+</main>
+<script>
+(() => {
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const W=1000,H=650, lanes=[300,500,700], playerY=500;
+const C={bg:'#0d1426',road:'#222c43',lane:'#4b5e80',white:'#f5f8ff',cyan:'#39dceb',yellow:'#ffd44d',red:'#ff5d6e',green:'#60eb9c',purple:'#a685ff',dark:'#080c18'};
+const questions=[
+{q:'What does AI stand for?',o:['Artificial Intelligence','Automatic Internet','Advanced Input'],a:0,f:'AI helps computers perform tasks that usually need human intelligence.'},
+{q:'Which is a strong password?',o:['123456','robot','R0b0t!Safe_82'],a:2,f:'Use long, unique passwords and enable multi-factor authentication.'},
+{q:'What should you do with a suspicious link?',o:['Click quickly',"Check it; don't click if unsure",'Send it to everyone'],a:1,f:'Phishing messages try to trick people into revealing information.'},
+{q:'What is a dataset?',o:['A collection of data','A computer cable','A game level'],a:0,f:'AI systems often learn patterns from examples in datasets.'},
+{q:'Which information should you keep private online?',o:['Your password','A public weather report','A public science fact'],a:0,f:'Never share passwords or one-time passcodes.'},
+{q:'What does a firewall help do?',o:['Cook food','Filter network traffic','Charge a laptop'],a:1,f:'A firewall helps control incoming and outgoing network traffic.'},
+{q:'Can AI sometimes make mistakes?',o:['No, never','Yes, it can','Only at night'],a:1,f:'Always check important AI-generated information.'}
+];
+let best=0;try{best=Number(localStorage.getItem('airr-best')||0)}catch(e){}
+let state='menu',g;
+function reset(){g={lane:1,obs:[],distance:0,score:0,energy:0,speed:5,spawn:0,jump:0,slide:0,q:null,feedback:'',feedbackTimer:0,nextQ:650,flash:0};}
+reset();
+function rect(x,y,w,h,r,fill,stroke=null,lw=2){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke()}}
+function text(t,size,color,x,y,center=true,bold=true){ctx.font=`${bold?'bold ':''}${size}px Arial`;ctx.fillStyle=color;ctx.textAlign=center?'center':'left';ctx.textBaseline='middle';ctx.fillText(t,x,y)}
+function bg(offset=0){ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);for(let i=0;i<45;i++){ctx.fillStyle='#263552';ctx.beginPath();ctx.arc((i*97+23)%W,(i*53+17)%H,1.5,0,Math.PI*2);ctx.fill()}ctx.fillStyle=C.road;ctx.fillRect(190,0,620,H);ctx.strokeStyle=C.lane;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(190,0);ctx.lineTo(190,H);ctx.moveTo(810,0);ctx.lineTo(810,H);ctx.stroke();for(const x of [400,600])for(let y=-90;y<H+90;y+=90){ctx.fillStyle='#4e5b7a';ctx.fillRect(x-3,y+(offset%90),6,42)}for(let y=-70;y<H+80;y+=140){let yy=(y+offset*.55)%(H+140)-70;ctx.strokeStyle='#172f44';ctx.lineWidth=3;ctx.beginPath();ctx.arc(130,yy,25,0,Math.PI*2);ctx.arc(870,yy,25,0,Math.PI*2);ctx.stroke()}}
+function robot(x,y,jump=false,slide=false){ctx.fillStyle='#070b14';ctx.beginPath();ctx.ellipse(x,playerY+50,38,9,0,0,Math.PI*2);ctx.fill();if(slide){rect(x-38,y+5,76,37,12,'#8297b2',C.cyan,3);rect(x-28,y-5,42,34,10,'#cde5f4',C.cyan,3);ctx.fillStyle=C.dark;ctx.beginPath();ctx.arc(x-15,y+8,4,0,7);ctx.arc(x+1,y+8,4,0,7);ctx.fill();return}let by=y+(jump?8:0);rect(x-29,by-3,58,58,13,'#8297b2',C.cyan,3);rect(x-31,by-39,62,43,12,'#cde5f4',C.cyan,3);ctx.fillStyle=C.dark;ctx.beginPath();ctx.arc(x-13,by-23,5,0,7);ctx.arc(x+13,by-23,5,0,7);ctx.fill();ctx.strokeStyle=C.cyan;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,by-40);ctx.lineTo(x,by-51);ctx.stroke();ctx.fillStyle=C.yellow;ctx.beginPath();ctx.arc(x,by-54,5,0,7);ctx.fill();ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(x-21,by+55);ctx.lineTo(x-27,by+72);ctx.moveTo(x+21,by+55);ctx.lineTo(x+27,by+72);ctx.moveTo(x-29,by+12);ctx.lineTo(x-41,by+29);ctx.moveTo(x+29,by+12);ctx.lineTo(x+41,by+29);ctx.stroke()}
+function obstacle(o){let x=lanes[o.lane],y=o.y;if(o.type==='barrier'){rect(x-43,y-20,86,48,9,'#692d42',C.red,3);ctx.strokeStyle='#ffa0a2';ctx.lineWidth=5;for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-31+k*25,y-15);ctx.lineTo(x-17+k*25,y+22);ctx.stroke()}}else if(o.type==='gate'){rect(x-43,y-58,13,70,5,C.purple);rect(x+30,y-58,13,70,5,C.purple);rect(x-43,y-61,86,18,5,'#7d60d8');text('SLIDE',12,C.white,x,y-33)}else{rect(x-29,y-32,58,58,12,'#255e49',C.green,3);text('+',30,C.white,x,y-3)}}
+function hud(){rect(22,18,220,90,15,'#121c31','#354c6e');text('SCORE  '+g.score,24,C.white,40,42,false);text('ENERGY  '+g.energy,18,C.green,40,82,false);rect(760,18,218,90,15,'#121c31','#354c6e');text('BEST  '+best,20,C.yellow,780,42,false);text('SPEED  '+g.speed.toFixed(1),18,C.cyan,780,78,false)}
+function panel(title,sub){ctx.fillStyle='#040812c9';ctx.fillRect(0,0,W,H);rect(175,115,650,425,24,'#141f39','#3f5d8c',3);text(title,38,C.cyan,500,165);if(sub)text(sub,20,C.white,500,210)}
+function menu(){bg(g.distance*2);robot(500,405);text('AI ROBOT RESCUE',46,C.cyan,500,115);text('RUN  •  LEARN  •  SURVIVE',22,C.white,500,165);rect(315,260,370,65,15,'#162a49',C.cyan,2);text('PRESS ENTER OR START',23,C.white,500,292);text('← → Move lanes     ↑ / SPACE Jump     ↓ Slide',18,'#cbd7eb',500,365);text('Collect green energy cells. Avoid red barriers and slide under purple gates.',16,'#aabbd7',500,400);text('Answer AI & cybersecurity questions to earn bonus points.',16,'#aabbd7',500,428);text('Best score: '+best,18,C.yellow,500,490)}
+function question(){panel('LEARNING CHECKPOINT','Choose an answer (1, 2, or 3)');if(!g.q)return;text(g.q.q,24,C.white,500,260);g.q.o.forEach((o,i)=>{rect(245,300+i*54,510,43,10,'#202f4e','#4b6797');text((i+1)+'.  '+o,19,C.white,500,321+i*54)});text('Click an answer or press 1, 2, or 3.',16,C.green,500,480);if(g.feedback){text(g.feedback,20,g.feedback.startsWith('Correct')?C.yellow:C.red,500,515);text(g.q.f,15,'#becde5',500,540)}}
+function over(){bg(g.distance*2);robot(500,405);panel('MISSION ENDED','The robot needs a recharge!');text('Your score: '+g.score,27,C.white,500,275);text('Energy collected: '+g.energy,21,C.green,500,320);text('Best score: '+best,21,C.yellow,500,355);rect(335,405,330,55,13,'#162a49',C.cyan,2);text('PRESS ENTER TO PLAY AGAIN',19,C.white,500,432);text('Use the Start / Restart button too',16,'#b4c2dc',500,485)}
+function start(){reset();state='playing'}
+function answer(i){if(state!=='question'||!g.q||g.feedbackTimer>0)return;if(i===g.q.a){g.score+=50;g.feedback='Correct! +50 points';g.flash=12}else g.feedback='Not quite — learn this fact!';g.feedbackTimer=150}
+function key(k){if(state==='menu'||state==='gameover'){if(k==='Enter'||k===' '){start()}return}if(state==='question'){if(['1','2','3'].includes(k))answer(Number(k)-1);return}if(state!=='playing')return;if(k==='ArrowLeft'||k==='a')g.lane=Math.max(0,g.lane-1);if(k==='ArrowRight'||k==='d')g.lane=Math.min(2,g.lane+1);if((k==='ArrowUp'||k==='w'||k===' ')&&g.jump<=0&&g.slide<=0)g.jump=42;if((k==='ArrowDown'||k==='s')&&g.slide<=0&&g.jump<=0)g.slide=34}
+window.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();key(e.key)});
+document.querySelectorAll('[data-key]').forEach(b=>b.addEventListener('click',()=>key(b.dataset.key)));
+document.getElementById('start').addEventListener('click',start);
+canvas.addEventListener('click',e=>{const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(state==='menu'||state==='gameover'){start();return}if(state==='question'){for(let i=0;i<3;i++)if(x>=245&&x<=755&&y>=300+i*54&&y<=343+i*54)answer(i)}});
+function tick(){if(state==='playing'){g.distance+=g.speed;g.score++;g.speed=Math.min(11,5+g.distance/6000);g.spawn++;if(g.spawn>Math.max(34,78-Math.floor(g.speed*3))){let r=Math.random();g.obs.push({lane:Math.floor(Math.random()*3),y:-50,type:r<.25?'energy':r<.55?'gate':'barrier'});g.spawn=0}if(g.jump>0)g.jump--;if(g.slide>0)g.slide--;if(g.flash>0)g.flash--;let py=playerY-(g.jump>0?95*(1-Math.abs(g.jump-21)/21):0);for(let i=g.obs.length-1;i>=0;i--){let o=g.obs[i];o.y+=g.speed;if(o.y>H+80){g.obs.splice(i,1);continue}if(Math.abs(o.y-playerY)<35&&o.lane===g.lane){if(o.type==='energy'){g.energy++;g.score+=25;g.obs.splice(i,1)}else if((o.type==='barrier'&&g.jump<=0)||(o.type==='gate'&&g.slide<=0)){state='gameover';if(g.score>best){best=g.score;try{localStorage.setItem('airr-best',best)}catch(e){}}break}}}if(state==='playing'&&g.distance>=g.nextQ){g.nextQ+=700+Math.random()*300;g.q=questions[Math.floor(Math.random()*questions.length)];g.feedback='';g.feedbackTimer=0;state='question'}}else if(state==='question'&&g.feedbackTimer>0){g.feedbackTimer--;if(g.feedbackTimer===0){g.q=null;state='playing'}}if(state==='menu')menu();else if(state==='playing'){bg(g.distance*2);g.obs.forEach(obstacle);robot(lanes[g.lane],Math.round(playerY-(g.jump>0?95*(1-Math.abs(g.jump-21)/21):0)),g.jump>0,g.slide>0);hud();if(g.flash){ctx.strokeStyle='#64ffb4';ctx.lineWidth=5;ctx.strokeRect(3,3,W-6,H-6)}}else if(state==='question'){bg(g.distance*2);g.obs.forEach(obstacle);robot(lanes[g.lane],playerY);hud();question()}else over();requestAnimationFrame(tick)}
+tick();
+})();
+</script></body></html>
